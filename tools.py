@@ -48,3 +48,5 @@ def crop_block( thresh, x, y):
 
     block4 = thresh[int(11 / 18 * y): int(15 / 18 * y), int(5 / 18 * x): int(13 / 18 * x)]
     return block1, block2, block3, block4
+
+
