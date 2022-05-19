@@ -210,6 +210,7 @@ class Record():
                 digit += str(np.argmax(score))
             else:
                 digit = 0
+        print(digit)
         return int(digit)
 
     def get_match_score(self, img, template):
