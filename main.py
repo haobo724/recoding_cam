@@ -1,7 +1,9 @@
+import asyncio
 import os
+import queue
 import time
 import tkinter as tk
-
+import threading
 import cv2
 import numpy as np
 from tools import order_points_new, crop_block
@@ -9,7 +11,7 @@ from tools import order_points_new, crop_block
 
 # Press Umschalt+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-
+q  = queue.Queue()
 class Record():
     def __init__(self):
         self.camera_top = None
@@ -63,13 +65,34 @@ class Record():
                                  command=self.start)  # Button按钮, command中调用定义的方法
         self.start_b.pack()
         self.temp_turple = ()
-        # self.get_force()
+        self.loop =  asyncio.new_event_loop()
+        self.t_tof= threading.Thread(target=self.get_loop,args=(self.loop ,    ))
+        self.t_tof.start()
+        t = self.get_tof()
+        asyncio.run_coroutine_threadsafe(t, self.loop)
         self.frame.mainloop()
+
+    def get_loop(self,loop):
+        asyncio.set_event_loop(loop)
+        loop.run_forever()
+
+    async def get_tof(self):
+        while True:
+
+            try:
+                c = q.get()
+                if not c:
+                    break
+            except:
+                print('jo')
+                print(c)
+
+
 
     def start(self):
         self.camera_top = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.camera_bot = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-        self.temp_turple = self.get_4_point()
+        self.job = self.frame.after(1,self.get_4_point())
         while self.stoped == False and self.camera_top.isOpened():
             # self.get_force()
             self.job = self.frame.after(1, self.get_force())
@@ -78,7 +101,7 @@ class Record():
 
     def switch(self):
         self.stoped = True
-        # self.shut_down()
+        self.frame.after(1,self.shut_down())
 
     def new_writer(self):
         self.out_top_path = f'patient{self.patient_idx}_top.mp4'
@@ -98,9 +121,9 @@ class Record():
                 break
             elif k == ord('s'):
                 x, y, w, h = cv2.selectROI('frame_bot', frame_bot, fromCenter=False)
-
+                self.temp_turple = x, y, w, h
                 break
-        return x, y, w, h
+
 
     # def start_cam(self):
     #     self.camera_top = cv2.VideoCapture(0)
@@ -134,7 +157,9 @@ class Record():
             self.my_label.update()
             self.out_top.write(frame_top)
             self.recoding_flag =True
-            cv2.imshow('test',frame_top)
+            cv2.imshow('Recoding parameter', frame_bot)
+            cv2.waitKey(1)
+            cv2.imshow('Recoding TOP',frame_top)
             cv2.waitKey(1)
             return
             # self.job = self.frame.after(1, self.get_force())
@@ -224,8 +249,11 @@ class Record():
         return score
 
     def shut_down(self):
-
-        self.out_top.release()
+        try:
+            self.out_top.release()
+            q.put(False)
+        except AttributeError:
+            print('Camera not start')
 
         # self.out_bot.release()
 
@@ -233,12 +261,20 @@ class Record():
 
             pass
         else:
-            self.camera_top.release()
+            try:
+                self.camera_top.release()
+            except AttributeError:
+                print('Camera not start')
             # self.camera_bot.release()
             print('Done')
             cv2.destroyAllWindows()
             print(self.out_top_path)
-            self.frame.quit()
+            # self.loop.stop()
+            # self.loop.close()
+            self.loop.call_soon_threadsafe(self.loop.stop)
+
+            self.t_tof.join()
+            self.frame.after(1,self.frame.quit)
 
 
 if __name__ == '__main__':
