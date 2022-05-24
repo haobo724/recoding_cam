@@ -1,5 +1,35 @@
+import queue
+
 import numpy as np
 
+class Buffer():
+    def __init__(self,size):
+        self.q  = queue.Queue(size)
+        self.list = []
+
+    def __getitem__(self,num):
+        if num > len(self.list):
+            raise IndexError('list index out of range')
+        return self.list[num]
+
+
+    def append(self,num):
+        if not self.q.full():
+            self.q.put(num)
+            self.list.append(num)
+        else:
+            self.q.get()
+            self.q.put(num)
+            del self.list[0]
+            self.list.append(num)
+    def mean(self):
+        if self.q.empty():
+            return 0
+        return np.mean(self.list)
+    def most(self):
+        vals, counts = np.unique(self.list, return_counts=True)
+        index = np.argmax(counts)
+        return vals[index]
 def order_points_new( pts):
     # sort the points based on their x-coordinates
     xSorted = pts[np.argsort(pts[:, 0]), :]
@@ -50,3 +80,16 @@ def crop_block( thresh, x, y):
     return block1, block2, block3, block4
 
 
+if __name__ == '__main__':
+    buffer = Buffer(5)
+    buffer.append(10)
+    buffer.append(10)
+    buffer.append(10)
+    buffer.append(10)
+    buffer.append(100)
+    buffer.append(100)
+    buffer.append(100)
+    buffer.append(100)
+    buffer.append(100)
+    buffer.append(100)
+    print(buffer[-10])

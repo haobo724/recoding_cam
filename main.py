@@ -1,16 +1,20 @@
 import asyncio
 import os
 import queue
-import time
+
 import tkinter as tk
 import threading
 import cv2
 import numpy as np
-from tools import order_points_new, crop_block
+from tools import order_points_new, crop_block,Buffer
 
 # Press Umschalt+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 stop_queue = queue.Queue()
+
+
+
+
 
 
 class Record():
@@ -71,8 +75,9 @@ class Record():
         self.t_tof.start()
         t = self.get_tof()
         asyncio.run_coroutine_threadsafe(t, self.loop)
-        self.frame.mainloop()
+        self.buffer_froce = Buffer(50)
 
+        self.frame.mainloop()
     def get_loop(self, loop):
         asyncio.set_event_loop(loop)
         loop.run_forever()
@@ -127,7 +132,7 @@ class Record():
                 x, y, w, h = cv2.selectROI('frame_bot', frame_bot, fromCenter=False)
                 self.temp_turple = x, y, w, h
                 break
-
+        cv2.destroyAllWindows()
     # def start_cam(self):
     #     self.camera_top = cv2.VideoCapture(0)
     #     # self.camera_bot = cv2.VideoCapture(1)
@@ -152,18 +157,23 @@ class Record():
         block3 = frame_bot[y:y + h, x:x + w]
 
         self.force = self.block_analyse(block3)
+        self.buffer_froce.append(self.force)
+        most= self.buffer_froce.most()
+        if most > 5:
+            self.recoding_flag = True
+
 
         # self.force = np.random.randint(5, 300)
-        if self.force > 5:
+        if self.force > 5 or most >5:
+
             self.my_label.config(text='Recording Is On!')
             self.my_label.update()
             self.out_top.write(frame_top)
-            self.recoding_flag = True
             cv2.imshow('Recoding parameter', frame_bot)
             cv2.waitKey(1)
             cv2.imshow('Recoding TOP', frame_top)
             cv2.waitKey(1)
-            return
+            # return
             # self.job = self.frame.after(1, self.get_force())
 
             # self.out_bot.write(frame_bot)
