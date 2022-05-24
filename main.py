@@ -8,10 +8,11 @@ import cv2
 import numpy as np
 from tools import order_points_new, crop_block
 
-
 # Press Umschalt+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-q  = queue.Queue()
+stop_queue = queue.Queue()
+
+
 class Record():
     def __init__(self):
         self.camera_top = None
@@ -65,14 +66,14 @@ class Record():
                                  command=self.start)  # Button按钮, command中调用定义的方法
         self.start_b.pack()
         self.temp_turple = ()
-        self.loop =  asyncio.new_event_loop()
-        self.t_tof= threading.Thread(target=self.get_loop,args=(self.loop ,    ))
+        self.loop = asyncio.new_event_loop()
+        self.t_tof = threading.Thread(target=self.get_loop, args=(self.loop,))
         self.t_tof.start()
         t = self.get_tof()
         asyncio.run_coroutine_threadsafe(t, self.loop)
         self.frame.mainloop()
 
-    def get_loop(self,loop):
+    def get_loop(self, loop):
         asyncio.set_event_loop(loop)
         loop.run_forever()
 
@@ -80,19 +81,22 @@ class Record():
         while True:
 
             try:
-                c = q.get()
-                if not c:
+                stop_flag = stop_queue.get_nowait()
+                print(stop_flag)
+                if stop_flag:
                     break
-            except:
-                print('jo')
-                print(c)
-
+            except queue.Empty :
+                await asyncio.sleep(1)
+            if self.recoding_flag :
+                print('tof is running...')
+            else:
+                print('tof is still waiting...')
 
 
     def start(self):
         self.camera_top = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.camera_bot = cv2.VideoCapture(1, cv2.CAP_DSHOW)
-        self.job = self.frame.after(1,self.get_4_point())
+        self.job = self.frame.after(1, self.get_4_point())
         while self.stoped == False and self.camera_top.isOpened():
             # self.get_force()
             self.job = self.frame.after(1, self.get_force())
@@ -101,7 +105,7 @@ class Record():
 
     def switch(self):
         self.stoped = True
-        self.frame.after(1,self.shut_down())
+        self.frame.after(1, self.shut_down())
 
     def new_writer(self):
         self.out_top_path = f'patient{self.patient_idx}_top.mp4'
@@ -123,7 +127,6 @@ class Record():
                 x, y, w, h = cv2.selectROI('frame_bot', frame_bot, fromCenter=False)
                 self.temp_turple = x, y, w, h
                 break
-
 
     # def start_cam(self):
     #     self.camera_top = cv2.VideoCapture(0)
@@ -150,16 +153,15 @@ class Record():
 
         self.force = self.block_analyse(block3)
 
-
         # self.force = np.random.randint(5, 300)
         if self.force > 5:
             self.my_label.config(text='Recording Is On!')
             self.my_label.update()
             self.out_top.write(frame_top)
-            self.recoding_flag =True
+            self.recoding_flag = True
             cv2.imshow('Recoding parameter', frame_bot)
             cv2.waitKey(1)
-            cv2.imshow('Recoding TOP',frame_top)
+            cv2.imshow('Recoding TOP', frame_top)
             cv2.waitKey(1)
             return
             # self.job = self.frame.after(1, self.get_force())
@@ -169,8 +171,8 @@ class Record():
             cv2.destroyAllWindows()
             self.my_label.config(text='Recording Is off!')
             self.my_label.update()
-            if self.recoding_flag :
-                self.recoding_flag=False
+            if self.recoding_flag:
+                self.recoding_flag = False
                 self.pause()
             return
 
@@ -182,6 +184,7 @@ class Record():
         self.patient_label.config(text=f"Paitent : {self.patient_idx}")
         self.patient_label.update()
         return
+
     def block_analyse(self, imfrag):
         # new method of reading digits in the imfrag
         _, imfrag_h = imfrag.shape
@@ -196,7 +199,6 @@ class Record():
         digitCnts = []
         xloc = np.array([])
         for c in cnts:
-
             (x, y, w, h) = cv2.boundingRect(c)
             # print(h)
             # if height is more than 50, then digit is detected
@@ -221,7 +223,7 @@ class Record():
         # print(len(digitCnts))
         for c in digitCnts:
             (x, y, w, h) = cv2.boundingRect(c)
-            roi = imfrag[y:y + h, x :x + w]
+            roi = imfrag[y:y + h, x:x + w]
 
             if roi is not None:
                 roi = cv2.resize(roi, (50, 90))
@@ -235,7 +237,7 @@ class Record():
                 digit += str(np.argmax(score))
             else:
                 digit = 0
-        print(digit)
+        # print(digit)
         return int(digit)
 
     def get_match_score(self, img, template):
@@ -251,7 +253,7 @@ class Record():
     def shut_down(self):
         try:
             self.out_top.release()
-            q.put(False)
+            stop_queue.put(True)
         except AttributeError:
             print('Camera not start')
 
@@ -274,7 +276,7 @@ class Record():
             self.loop.call_soon_threadsafe(self.loop.stop)
 
             self.t_tof.join()
-            self.frame.after(1,self.frame.quit)
+            self.frame.after(1, self.frame.quit)
 
 
 if __name__ == '__main__':
