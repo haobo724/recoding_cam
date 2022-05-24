@@ -26,13 +26,14 @@ class Record():
         self.x = 0
         self.y = 0
         codec = cv2.VideoWriter_fourcc(*'mp4v')
+        codec2 = cv2.VideoWriter_fourcc(*'mp4v')
         self.patient_idx = 0
         self.pause_flag = True
         self.recoding_flag = False
         self.out_top_path = f'patient{self.patient_idx}_top.mp4'
         self.out_bot_path = f'patient{self.patient_idx}_bot.mp4'
-        self.out_top = cv2.VideoWriter(self.out_top_path, codec, 25, (640, 480))
-        self.out_bot = cv2.VideoWriter(self.out_top_path, codec, 25, (640, 480))
+        self.out_top = cv2.VideoWriter(self.out_top_path, codec, 10, (640, 480))
+        self.out_bot = cv2.VideoWriter(self.out_bot_path, codec2, 10, (640, 480))
         self.template_dir = 'OCR_template'
         self.img_template = []
         if os.path.exists(self.template_dir):
@@ -102,7 +103,7 @@ class Record():
         self.camera_top = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.camera_bot = cv2.VideoCapture(1, cv2.CAP_DSHOW)
         self.job = self.frame.after(1, self.get_4_point())
-        while self.stoped == False and self.camera_top.isOpened():
+        while self.stoped == False and self.camera_top.isOpened() and self.camera_bot.isOpened():
             # self.get_force()
             self.job = self.frame.after(1, self.get_force())
 
@@ -114,10 +115,11 @@ class Record():
 
     def new_writer(self):
         self.out_top_path = f'patient{self.patient_idx}_top.mp4'
-        # self.out_bot_path = f'patient{self.patient_idx}_bot.mp4'
+        self.out_bot_path = f'patient{self.patient_idx}_bot.mp4'
         codec = cv2.VideoWriter_fourcc(*'mp4v')
+        codec2 = cv2.VideoWriter_fourcc(*'mp4v')
         self.out_top = cv2.VideoWriter(self.out_top_path, codec, 25, (640, 480))
-        # self.out_bot = cv2.VideoWriter(self.out_bot_path, codec, 10, (1080, 1920))
+        self.out_bot = cv2.VideoWriter(self.out_bot_path, codec2, 25, (480, 640))
 
     def get_4_point(self):
         while True:
@@ -149,12 +151,12 @@ class Record():
     def get_force(self):
         ret2, frame_bot = self.camera_bot.read()
         ret, frame_top = self.camera_top.read()
-        frame_bot = cv2.cvtColor(frame_bot, cv2.COLOR_BGR2GRAY)
+        frame_bot_gray = cv2.cvtColor(frame_bot, cv2.COLOR_BGR2GRAY)
         x, y, w, h = self.temp_turple
         # dst = cv2.warpPerspective(frame_bot, self.M, (int(self.x), int(self.y))).astype(np.uint8)
         # dst = cv2.cvtColor(dst, cv2.COLOR_RGB2GRAY)
         # block1, block2, block3, block4 = crop_block(dst)
-        block3 = frame_bot[y:y + h, x:x + w]
+        block3 = frame_bot_gray[y:y + h, x:x + w]
 
         self.force = self.block_analyse(block3)
         self.buffer_froce.append(self.force)
@@ -169,14 +171,11 @@ class Record():
             self.my_label.config(text='Recording Is On!')
             self.my_label.update()
             self.out_top.write(frame_top)
+            self.out_bot.write(frame_bot)
             cv2.imshow('Recoding parameter', frame_bot)
-            cv2.waitKey(1)
             cv2.imshow('Recoding TOP', frame_top)
             cv2.waitKey(1)
-            # return
-            # self.job = self.frame.after(1, self.get_force())
 
-            # self.out_bot.write(frame_bot)
         else:
             cv2.destroyAllWindows()
             self.my_label.config(text='Recording Is off!')
@@ -187,6 +186,7 @@ class Record():
             return
 
     def pause(self):
+        self.out_bot.release()
         self.out_top.release()
         self.patient_idx += 1
         self.new_writer()
@@ -263,6 +263,7 @@ class Record():
     def shut_down(self):
         try:
             self.out_top.release()
+            self.out_bot.release()
             stop_queue.put(True)
         except AttributeError:
             print('Camera not start')
@@ -275,6 +276,7 @@ class Record():
         else:
             try:
                 self.camera_top.release()
+                self.camera_bot.release()
             except AttributeError:
                 print('Camera not start')
             # self.camera_bot.release()
