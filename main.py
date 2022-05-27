@@ -1,6 +1,7 @@
 import asyncio
 import os
 import queue
+import tkinter
 
 import tkinter as tk
 import threading
@@ -11,7 +12,6 @@ from tools import order_points_new, crop_block,Buffer
 # Press Umschalt+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 stop_queue = queue.Queue()
-
 
 
 
@@ -46,7 +46,6 @@ class Record():
 
         self.frame = tk.Tk()  # frame 组件
 
-        # frame.pack(side=tk.LEFT, padx=10, pady=10)
 
         self.stoped_b = tk.Button(self.frame, text='stoped', bg='black', fg='white',
                                   command=self.switch)  # Button按钮, command中调用定义的方法
@@ -199,7 +198,7 @@ class Record():
         # new method of reading digits in the imfrag
         _, imfrag_h = imfrag.shape
         ret2, imfrag = cv2.threshold(imfrag, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-
+        roi_size =  (50, 90)
         # detect single digit and detect
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义矩形结构元素
 
@@ -227,7 +226,7 @@ class Record():
             digitCnts.append(tmp[i])
 
         digit = ''
-        if len(digitCnts) != 1:
+        if len(digitCnts) > 3 or len(digitCnts)<1:
             print('detect error,Suggested click restart btn')
             return -1
         # print(len(digitCnts))
@@ -236,28 +235,40 @@ class Record():
             roi = imfrag[y:y + h, x:x + w]
 
             if roi is not None:
-                roi = cv2.resize(roi, (50, 90))
+                roi = cv2.resize(roi,roi_size)
                 # cv2.imshow('roi',roi)
                 # cv2.waitKey()
                 roi = cv2.morphologyEx(roi, cv2.MORPH_CLOSE, kernel, iterations=1)
 
-                score = np.zeros(10)
+                acc = np.zeros(10)
                 for i in range(10):
-                    score[i] = self.get_match_score(roi, self.img_template[i])
-                digit += str(np.argmax(score))
+                    acc[i] = self.get_match_score(roi, self.img_template[i])
+                if np.max(acc) < 0.8:
+                    print(acc)
+                    digit += '-1'
+                else:
+                    digit += str(np.argmax(acc))
             else:
                 digit = 0
-        # print(digit)
-        return int(digit)
+        try :
+            result = int(digit)
+        except ValueError:
+            result = -1
+        if result >200:
+            return -1
+        else:
+            print(result)
+        return result
 
     def get_match_score(self, img, template):
         # print(np.max(template))
         tp = (img == 255) == (template == 255)
-        fp = (img == 0) == (template == 0)
-        tn = (img == 255) == (template == 0)
+        tn = (img == 0) == (template == 0)
+        fp = (img == 255) == (template == 0)
         fn = (img == 0) == (template == 255)
 
-        score = np.sum(tp) + np.sum(fp) - np.sum(tn) - np.sum(fn)
+        # score =( np.sum(tp) + np.sum(tn)) / (np.sum(tp) + np.sum(tn) + np.sum(fp) + np.sum(fn))
+        score =( np.sum(tp) + np.sum(tn)- np.sum(fp) - np.sum(fn))
         return score
 
     def shut_down(self):
