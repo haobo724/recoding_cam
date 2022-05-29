@@ -1,8 +1,6 @@
 import asyncio
 import os
 import queue
-import tkinter
-
 import tkinter as tk
 import threading
 import cv2
