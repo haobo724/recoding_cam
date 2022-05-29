@@ -38,8 +38,11 @@ class Record():
         self.img_template = []
         if os.path.exists(self.template_dir):
             for i in range(10):
-                img_file_path = os.path.join(self.template_dir, "result_" + str(i) + '.tiff')
-                self.img_template.append(cv2.imread(img_file_path, 0))
+                img_file_path = os.path.join(self.template_dir,  str(i) + '.jpg')
+                t = cv2.imread(img_file_path, 0)
+                t =cv2.resize(t,(40,80))
+                print(np.max(t))
+                self.img_template.append(t)
                 print(f'[INFO] TEMPLATE {i} lOADED')
         else:
             raise FileNotFoundError('NO TEMPLATE')
@@ -99,7 +102,7 @@ class Record():
 
 
     def start(self):
-        self.camera_top = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+        self.camera_top = cv2.VideoCapture(2, cv2.CAP_DSHOW)
         self.camera_bot = cv2.VideoCapture(1, cv2.CAP_DSHOW)
         self.job = self.frame.after(1, self.get_4_point())
         while self.stoped == False and self.camera_top.isOpened() and self.camera_bot.isOpened():
@@ -159,13 +162,13 @@ class Record():
 
         self.force = self.block_analyse(block3)
         self.buffer_froce.append(self.force)
-        most= self.buffer_froce.most()
+        most= int (self.buffer_froce.most())
         if most > 5:
             self.recoding_flag = True
 
 
         # self.force = np.random.randint(5, 300)
-        if self.force > 5 or most >5:
+        if int(self.force) > 5 or most >5:
 
             self.my_label.config(text='Recording Is On!')
             self.my_label.update()
@@ -198,7 +201,7 @@ class Record():
         # new method of reading digits in the imfrag
         _, imfrag_h = imfrag.shape
         ret2, imfrag = cv2.threshold(imfrag, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-        roi_size =  (50, 90)
+        roi_size =  (40, 80)
         # detect single digit and detect
         kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义矩形结构元素
 
@@ -211,13 +214,13 @@ class Record():
             (x, y, w, h) = cv2.boundingRect(c)
             # print(h)
             # if height is more than 50, then digit is detected
-            # if h > 30 / 85 * imfrag_h:
-            digitCnts.append(c)
-            xloc = np.append(xloc, x)
+            if h > 30 / 85 * imfrag_h:
+                digitCnts.append(c)
+                xloc = np.append(xloc, x)
 
         # if no connected component is detected, return ''
         if digitCnts == []:
-            return ''
+            return -1
         # sort using x direction
         idx = np.argsort(xloc)
         tmp = digitCnts.copy()
