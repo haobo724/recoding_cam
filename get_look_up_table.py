@@ -1,7 +1,7 @@
 import cv2
 from liner_regression import get_regression
 import numpy as np
-from tools import delet_contours
+from tools import delet_contours,block_analyse
 def load_video(path1,path2):
     video_top = cv2.VideoCapture(path1)
     video_bot = cv2.VideoCapture(path2)
@@ -45,6 +45,7 @@ def color( img):
             e_list.append(e)
     contours = delet_contours(contours, delete_list)
 
+
     if contours is None or len(contours) != 4:
         print(f'no markers')
         return [-1,-1,-1,-1]
@@ -71,7 +72,26 @@ def get_green_point(video):
 
 
 def get_height(video):
-    pass
+    height_list = []
+    ret, frame = video.read()
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    x, y, w, h = cv2.selectROI('frame_bot', frame, fromCenter=False)
+    block_height = frame[y:y + h, x:x + w]
+    height = block_analyse(block_height)
+    height_list.append(height)
+    while True:
+        ret, frame = video.read()
+
+        if ret:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            block_height = frame[y:y + h, x:x + w]
+            height = block_analyse(block_height)
+            height_list.append(height)
+
+        else:
+            break
+    return height_list
+
 
 def do_regression():
     pt1=get_regression()
