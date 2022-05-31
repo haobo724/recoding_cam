@@ -57,7 +57,6 @@ def color( img):
             x, y, w, h = cv2.boundingRect(new_c)
             pt = (int(x + w // 2), int(y + h // 2))  # 使用前三个矩m00, m01和m10计算重心
             np.append(innerpst,pt)
-
         return change_points(innerpst)
 def get_green_point(video):
     point_list = []
