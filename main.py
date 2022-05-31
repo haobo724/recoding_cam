@@ -286,6 +286,7 @@ class Record():
             self.loop.call_soon_threadsafe(self.loop.stop)
 
             self.t_tof.join()
+            self.t_tof2.join()
             self.frame.after(1, self.frame.quit)
 
 
