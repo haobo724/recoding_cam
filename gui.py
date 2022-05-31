@@ -94,7 +94,7 @@ def refine_template():
 
 if __name__ == '__main__':
     refine_template()
-    get_roi_binary()
+    # get_roi_binary()
     camera_top = cv2.VideoCapture(0, cv2.CAP_DSHOW)
     i =0
     while True:

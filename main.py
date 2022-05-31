@@ -20,7 +20,7 @@ e = threading.Event()
 
 
 def read_sensor(serialport='COM4', name='patient0'):
-    print("###starting thread###")
+    print(serialport+"###starting thread###")
     data_list = []
     with serial.Serial(
             port=serialport,
@@ -31,6 +31,7 @@ def read_sensor(serialport='COM4', name='patient0'):
             timeout=None) as ser:
 
         # data storage
+        ser.reset_input_buffer()
         distarray = np.zeros((4, 4, 8))  # 4 sensors, 4 x 8 pixelmatrix
         points = np.zeros((4, 4, 8, 3))  # 4 sensors, 4 x 8 pixelmatrix, 3 coordinates (x, y, z)
 
@@ -110,10 +111,15 @@ class Record():
         self.start_b.pack()
         self.temp_turple = ()
         self.loop = asyncio.new_event_loop()
+        self.loop2 = asyncio.new_event_loop()
         self.t_tof = threading.Thread(target=self.get_loop, args=(self.loop,))
+        self.t_tof2 = threading.Thread(target=self.get_loop, args=(self.loop2,))
         self.t_tof.start()
+        self.t_tof2.start()
         t = self.get_tof()
+        t2 = self.get_tof2()
         asyncio.run_coroutine_threadsafe(t, self.loop)
+        asyncio.run_coroutine_threadsafe(t2, self.loop2)
         self.buffer_froce = Buffer(50)
 
         self.frame.mainloop()
@@ -121,6 +127,20 @@ class Record():
     def get_loop(self, loop):
         asyncio.set_event_loop(loop)
         loop.run_forever()
+    async def get_tof2(self):
+        while True:
+            try:
+                stop_flag = stop_queue.get_nowait()
+                if stop_flag:
+                    break
+            except queue.Empty:
+                await asyncio.sleep(1)
+            if self.recoding_flag:
+                print('patient_' + str(self.patient_idx))
+                read_sensor(serialport='COM5', name='patientb_' + str(self.patient_idx))
+            else:
+                print('tof is still waiting...')
+
 
     async def get_tof(self):
         while True:
@@ -133,7 +153,6 @@ class Record():
             if self.recoding_flag:
                 print('patient_' + str(self.patient_idx))
                 read_sensor(serialport='COM4', name='patient_' + str(self.patient_idx))
-                read_sensor(serialport='COM5', name='patientb_' + str(self.patient_idx))
             else:
                 print('tof is still waiting...')
 
@@ -161,6 +180,7 @@ class Record():
     def get_4_point(self):
         while True:
             ret2, frame_bot = self.camera_bot.read()
+            frame_bot = np.rot90(frame_bot, 2)
 
             cv2.imshow('frame_bot', frame_bot)
             k = cv2.waitKey(1)
@@ -189,6 +209,7 @@ class Record():
     def get_force(self):
 
         ret2, frame_bot = self.camera_bot.read()
+        frame_bot = np.rot90(frame_bot,2)
         ret, frame_top = self.camera_top.read()
         frame_bot_gray = cv2.cvtColor(frame_bot, cv2.COLOR_BGR2GRAY)
         x, y, w, h = self.temp_turple
@@ -239,6 +260,7 @@ class Record():
         try:
             self.out_top.release()
             self.out_bot.release()
+            stop_queue.put(True)
             stop_queue.put(True)
             e.set()
         except AttributeError:
