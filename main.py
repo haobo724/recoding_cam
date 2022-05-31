@@ -3,8 +3,12 @@ import os
 import queue
 import tkinter as tk
 import threading
+from datetime import datetime
+import pickle
 import cv2
+import serial
 
+from tof_functions import read_sensor
 import numpy as np
 from tools import order_points_new, crop_block, Buffer, block_analyse
 
@@ -12,8 +16,54 @@ from tools import order_points_new, crop_block, Buffer, block_analyse
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 stop_queue = queue.Queue()
 
+e = threading.Event()
 
 
+def read_sensor(serialport='COM4', name='patient0'):
+    print("###starting thread###")
+    data_list = []
+    with serial.Serial(
+            port=serialport,
+            baudrate=115200,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
+            bytesize=serial.EIGHTBITS,
+            timeout=None) as ser:
+
+        # data storage
+        distarray = np.zeros((4, 4, 8))  # 4 sensors, 4 x 8 pixelmatrix
+        points = np.zeros((4, 4, 8, 3))  # 4 sensors, 4 x 8 pixelmatrix, 3 coordinates (x, y, z)
+
+        # debug_pose = set_debug_pose()
+
+        while not e.is_set():  # <-- insert read flag here
+            dataraw = bytearray(ser.read_until(b'\xff\xfa\xff\xfa'))
+            data = dataraw[-44:]
+            identifier = data[44 - 7]
+            # print('Sensor ID : ',identifier)
+            status = int.from_bytes(data[44 - 12:44 - 9], 'little')
+            # print('Sensorstatus: ', status)
+            if (data[44 - 8] == 1):
+                for i in range(8):
+                    distarray[identifier, 0, i] = int.from_bytes(data[i * 4:i * 4 + 3], 'little')
+                    # print("Reihe 1")
+            elif (data[44 - 8] == 2):
+                for i in range(8):
+                    distarray[identifier, 1, i] = int.from_bytes(data[i * 4:i * 4 + 3], 'little')
+                # print("Reihe 2")
+            elif (data[44 - 8] == 3):
+                for i in range(8):
+                    distarray[identifier, 2, i] = int.from_bytes(data[i * 4:i * 4 + 3], 'little')
+                # print("Reihe 3")
+            elif (data[44 - 8] == 4):
+                for i in range(8):
+                    distarray[identifier, 3, i] = int.from_bytes(data[i * 4:i * 4 + 3], 'little')
+                    # print("Reihe 4")
+            list1 = (['timestamp', datetime.now(), 'identifier', identifier, distarray[identifier, :, :]])
+            data_list.append(list1)
+
+        with open(name + '.pkl', 'wb') as f:
+            pickle.dump(data_list, f)
 
 
 class Record():
@@ -34,9 +84,7 @@ class Record():
         self.out_top = cv2.VideoWriter(self.out_top_path, codec, 10, (640, 480))
         self.out_bot = cv2.VideoWriter(self.out_bot_path, codec2, 10, (640, 480))
 
-
         self.frame = tk.Tk()  # frame 组件
-
 
         self.stoped_b = tk.Button(self.frame, text='stoped', bg='black', fg='white',
                                   command=self.switch)  # Button按钮, command中调用定义的方法
@@ -69,32 +117,31 @@ class Record():
         self.buffer_froce = Buffer(50)
 
         self.frame.mainloop()
+
     def get_loop(self, loop):
         asyncio.set_event_loop(loop)
         loop.run_forever()
 
     async def get_tof(self):
         while True:
-
             try:
                 stop_flag = stop_queue.get_nowait()
-                print(stop_flag)
                 if stop_flag:
                     break
-            except queue.Empty :
+            except queue.Empty:
                 await asyncio.sleep(1)
-            if self.recoding_flag :
-                print('tof is running...')
+            if self.recoding_flag:
+                print('patient_' + str(self.patient_idx))
+                read_sensor(serialport='COM4', name='patient_' + str(self.patient_idx))
+                read_sensor(serialport='COM5', name='patient_' + str(self.patient_idx))
             else:
                 print('tof is still waiting...')
 
-
     def start(self):
-        self.camera_top = cv2.VideoCapture(2, cv2.CAP_DSHOW)
+        self.camera_top = cv2.VideoCapture(0, cv2.CAP_DSHOW)
         self.camera_bot = cv2.VideoCapture(1, cv2.CAP_DSHOW)
         self.job = self.frame.after(1, self.get_4_point())
         while self.stoped == False and self.camera_top.isOpened() and self.camera_bot.isOpened():
-            # self.get_force()
             self.job = self.frame.after(1, self.get_force())
 
         self.shut_down()
@@ -125,6 +172,7 @@ class Record():
                 self.temp_turple = x, y, w, h
                 break
         cv2.destroyAllWindows()
+
     # def start_cam(self):
     #     self.camera_top = cv2.VideoCapture(0)
     #     # self.camera_bot = cv2.VideoCapture(1)
@@ -139,24 +187,25 @@ class Record():
         self.M = cv2.getPerspectiveTransform(pts1, pts2)
 
     def get_force(self):
+
         ret2, frame_bot = self.camera_bot.read()
         ret, frame_top = self.camera_top.read()
         frame_bot_gray = cv2.cvtColor(frame_bot, cv2.COLOR_BGR2GRAY)
         x, y, w, h = self.temp_turple
+
         # dst = cv2.warpPerspective(frame_bot, self.M, (int(self.x), int(self.y))).astype(np.uint8)
         # dst = cv2.cvtColor(dst, cv2.COLOR_RGB2GRAY)
         # block1, block2, block3, block4 = crop_block(dst)
         block3 = frame_bot_gray[y:y + h, x:x + w]
-
         self.force = block_analyse(block3)
         self.buffer_froce.append(self.force)
-        most= int (self.buffer_froce.most())
+        most = int(self.buffer_froce.most())
         if most > 5:
             self.recoding_flag = True
-
+            e.clear()
 
         # self.force = np.random.randint(5, 300)
-        if int(self.force) > 5 or most >5:
+        if int(self.force) > 5 or most > 5:
 
             self.my_label.config(text='Recording Is On!')
             self.my_label.update()
@@ -172,6 +221,7 @@ class Record():
             self.my_label.update()
             if self.recoding_flag:
                 self.recoding_flag = False
+                e.set()
                 self.pause()
             return
 
@@ -185,15 +235,12 @@ class Record():
         self.patient_label.update()
         return
 
-
-
-
-
     def shut_down(self):
         try:
             self.out_top.release()
             self.out_bot.release()
             stop_queue.put(True)
+            e.set()
         except AttributeError:
             print('Camera not start')
 

@@ -9,9 +9,11 @@ img_template = []
 if os.path.exists(template_dir):
     for i in range(10):
         img_file_path = os.path.join(template_dir, str(i) + '.jpg')
+        if not os.access(img_file_path,os.F_OK):
+            img_file_path = os.path.join(template_dir, 'result_'+str(i) + '.tiff')
+
         t = cv2.imread(img_file_path, 0)
-        t = cv2.resize(t, (40, 80))
-        print(np.max(t))
+        t = cv2.resize(t, (50, 90))
         img_template.append(t)
         print(f'[INFO] TEMPLATE {i} lOADED')
 else:
@@ -95,7 +97,7 @@ def crop_block( thresh, x, y):
 
     block4 = thresh[int(11 / 18 * y): int(15 / 18 * y), int(5 / 18 * x): int(13 / 18 * x)]
     return block1, block2, block3, block4
-def delet_contours(self, contours, delete_list):
+def delet_contours( contours, delete_list):
     # delta作用是offset，因为del是直接pop出去，修改长度了
     delta = 0
     for i in range(len(delete_list)):
@@ -108,7 +110,7 @@ def block_analyse(imfrag):
     # new method of reading digits in the imfrag
     _, imfrag_h = imfrag.shape
     ret2, imfrag = cv2.threshold(imfrag, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
-    roi_size =  (40, 80)
+    roi_size =  (50, 90)
     # detect single digit and detect
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))  # 定义矩形结构元素
 
@@ -167,7 +169,8 @@ def block_analyse(imfrag):
     if result >200:
         return -1
     else:
-        print(result)
+        pass
+        # print(result)
     return result
 
 def get_match_score(img, template):
