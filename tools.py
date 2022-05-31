@@ -78,7 +78,14 @@ def crop_block( thresh, x, y):
 
     block4 = thresh[int(11 / 18 * y): int(15 / 18 * y), int(5 / 18 * x): int(13 / 18 * x)]
     return block1, block2, block3, block4
-
+def delet_contours(self, contours, delete_list):
+    # delta作用是offset，因为del是直接pop出去，修改长度了
+    delta = 0
+    for i in range(len(delete_list)):
+        # print("i= ", i)
+        del contours[delete_list[i] - delta]
+        delta = delta + 1
+    return contours
 
 if __name__ == '__main__':
     buffer = Buffer(5)
