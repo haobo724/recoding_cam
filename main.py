@@ -133,7 +133,7 @@ class Record():
             if self.recoding_flag:
                 print('patient_' + str(self.patient_idx))
                 read_sensor(serialport='COM4', name='patient_' + str(self.patient_idx))
-                read_sensor(serialport='COM5', name='patient_' + str(self.patient_idx))
+                read_sensor(serialport='COM5', name='patientb_' + str(self.patient_idx))
             else:
                 print('tof is still waiting...')
 
