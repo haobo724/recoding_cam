@@ -50,6 +50,7 @@ def color( img):
         print(f'no markers')
         return [-1,-1,-1,-1]
     else:
+
         innerpst = np.array([])
         for c in contours:
             epsilon = 0.01 * cv2.arcLength(c, True)
