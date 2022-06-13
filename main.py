@@ -10,14 +10,26 @@ import serial
 
 from tof_functions import read_sensor
 import numpy as np
-from tools import order_points_new, crop_block, Buffer, block_analyse
+from tools import order_points_new, crop_block, Buffer, block_analyse,model_infer
 
 # Press Umschalt+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 stop_queue = queue.Queue()
 
 e = threading.Event()
+org = (50, 50)
+font = cv2.FONT_HERSHEY_SIMPLEX
 
+# fontScale
+fontScale = 1
+
+# Blue color in BGR
+color = (255, 0, 0)
+
+# Line thickness of 2 px
+thickness = 2
+
+# Using cv2.putText() method
 
 def read_sensor(serialport='COM4', name='patient0'):
     print(serialport+"###starting thread###")
@@ -68,7 +80,8 @@ def read_sensor(serialport='COM4', name='patient0'):
 
 
 class Record():
-    def __init__(self):
+    def __init__(self,area_reader):
+        self.area_reader=area_reader
         self.camera_top = None
         self.camera_bot = None
         self.stoped = False
@@ -227,24 +240,33 @@ class Record():
 
         # self.force = np.random.randint(5, 300)
         if int(self.force) > 5 or most > 5:
-
-            self.my_label.config(text='Recording Is On!')
+            water_mark = 'Recording Is On!'
+            self.my_label.config(text=water_mark)
             self.my_label.update()
             self.out_top.write(frame_top)
             self.out_bot.write(frame_bot)
-            cv2.imshow('Recoding parameter', frame_bot)
-            cv2.imshow('Recoding TOP', frame_top)
-            cv2.waitKey(1)
+
 
         else:
-            cv2.destroyAllWindows()
-            self.my_label.config(text='Recording Is off!')
+            # cv2.destroyAllWindows()
+            water_mark = 'Recording Is On!'
+
+            self.my_label.config(text=water_mark)
             self.my_label.update()
             if self.recoding_flag:
                 self.recoding_flag = False
                 e.set()
                 self.pause()
-            return
+        breast_pred = self.area_reader.forward(cv2.cvtColor(frame_top, cv2.COLOR_BGR2RGB)).astype(
+            np.uint8)
+        frame_top=cv2.putText(frame_top,water_mark, org, font,
+                    fontScale, color, thickness, cv2.LINE_AA)
+        frame_bot=cv2.putText(frame_bot,water_mark, org, font,
+                    fontScale, color, thickness, cv2.LINE_AA)
+        cv2.imshow('Recoding parameter', frame_bot)
+        cv2.imshow('Recoding TOP', frame_top)
+        cv2.imshow('Recoding TOP_breast_pred', breast_pred)
+        cv2.waitKey(1)
 
     def pause(self):
         self.out_bot.release()
@@ -291,4 +313,6 @@ class Record():
 
 
 if __name__ == '__main__':
-    R = Record()
+    area_reader = model_infer(
+        r'.\GoodModel\res34epoch=191-val_Iou=0.78.ckpt')
+    R = area_reader()

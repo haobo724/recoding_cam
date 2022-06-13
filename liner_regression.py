@@ -13,8 +13,10 @@ def get_regression(x,y):
     poly = PolynomialFeatures(degree = 5)
     X_poly = poly.fit_transform(x)
     poly.fit(X_poly, y)
+
     lin2 = LinearRegression()
     lin2.fit(X_poly, y)
+
     return poly,lin2
 
     # 画图
